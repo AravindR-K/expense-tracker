@@ -1,109 +1,189 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createTransaction, updateTransaction } from "../services/transactionService";
 
-const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-
-const CATEGORIES = {
-  expense: ["Food", "Transport", "Shopping", "Bills", "Entertainment", "Health", "Education", "Other"],
-  income:  ["Salary", "Freelance", "Business", "Investment", "Gift", "Other"],
-};
-
-const PAYMENTS = ["UPI", "Cash", "Debit Card", "Credit Card", "Bank Transfer", "Other"];
-
 export default function TransactionModal({ editData, onClose, onSuccess }) {
-  const isEdit = Boolean(editData);
 
-  const [type,    setType]    = useState(isEdit ? editData.type          : "expense");
-  const [amount,  setAmount]  = useState(isEdit ? String(editData.amount): "");
-  const [cat,     setCat]     = useState(isEdit ? editData.category      : "Food");
-  const [date,    setDate]    = useState(isEdit ? editData.date.slice(0, 10) : today());
-  const [pay,     setPay]     = useState(isEdit ? editData.paymentMethod  : "UPI");
-  const [note,    setNote]    = useState(isEdit ? (editData.note || "")   : "");
-  const [saving,  setSaving]  = useState(false);
-  const [err,     setErr]     = useState("");
+  const isEditing = Boolean(editData);
 
-  const switchType = (t) => {
-    setType(t);
-    setCat(t === "income" ? "Salary" : "Food");
+  // Form state holding all input values
+  const [formData, setFormData] = useState({
+    type: "expense",
+    amount: "",
+    category: "Food",
+    date: new Date().toISOString().slice(0, 10), 
+    paymentMethod: "UPI",
+    note: "",
+  });
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        type: editData.type,
+        amount: editData.amount,
+        category: editData.category,
+        date: editData.date ? editData.date.slice(0, 10) : "",
+        paymentMethod: editData.paymentMethod,
+        note: editData.note || "",
+      });
+    }
+  }, [editData]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "type") {
+      setFormData({
+        ...formData,
+        type: value,
+        category: value === "income" ? "Salary" : "Food",
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
-  const submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErr("");
-    if (!amount || Number(amount) <= 0) { setErr("Enter a valid amount."); return; }
-
-    setSaving(true);
+    setErrorMessage("");
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      setErrorMessage("Please enter an amount greater than 0");
+      return;
+    }
+    setLoading(true);
     try {
-      const payload = { type, amount: Number(amount), category: cat, date, paymentMethod: pay, note };
-      isEdit ? await updateTransaction(editData._id, payload) : await createTransaction(payload);
+      const payload = {
+        type: formData.type,
+        amount: Number(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        paymentMethod: formData.paymentMethod,
+        note: formData.note,
+      };
+
+      if (isEditing) {
+        await updateTransaction(editData._id, payload);
+      } else {
+        await createTransaction(payload);
+      }
+
       onSuccess();
-    } catch (ex) {
-      setErr(ex.response?.data?.message || "Something went wrong.");
+    } catch (error) {
+      console.error("Save error:", error);
+      setErrorMessage(error.response?.data?.message || "Failed to save transaction.");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="overlay" onClick={(e) => e.target === e.currentTarget && !saving && onClose()}>
-      <div className="modal">
-        <h2>{isEdit ? "Edit Transaction" : "Add Transaction"}</h2>
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <h2>{isEditing ? "Edit Transaction" : "Add Transaction"}</h2>
 
-        <form onSubmit={submit}>
-          {/* Type */}
-          <div className="field">
-            <label>Type</label>
-            <select value={type} onChange={(e) => switchType(e.target.value)}>
+        {errorMessage && <p className="error-alert">{errorMessage}</p>}
+
+        <form onSubmit={handleSubmit}>
+          {/* Transaction Type */}
+          <div className="form-group">
+            <label>Type:</label>
+            <select name="type" value={formData.type} onChange={handleChange}>
               <option value="expense">Expense</option>
               <option value="income">Income</option>
             </select>
           </div>
 
           {/* Amount */}
-          <div className="field">
-            <label>Amount (₹)</label>
-            <input type="number" min="0.01" step="0.01" placeholder="0.00"
-              value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <div className="form-group">
+            <label>Amount (₹):</label>
+            <input
+              type="number"
+              name="amount"
+              step="0.01"
+              min="0.01"
+              placeholder="e.g. 500"
+              value={formData.amount}
+              onChange={handleChange}
+              required
+            />
           </div>
 
-          {/* Category + Date */}
-          <div className="field-row">
-            <div className="field">
-              <label>Category</label>
-              <select value={cat} onChange={(e) => setCat(e.target.value)}>
-                {CATEGORIES[type].map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </div>
+          {/* Category */}
+          <div className="form-group">
+            <label>Category:</label>
+            <select name="category" value={formData.category} onChange={handleChange}>
+              {formData.type === "expense" ? (
+                <>
+                  <option value="Food">Food</option>
+                  <option value="Transport">Transport</option>
+                  <option value="Shopping">Shopping</option>
+                  <option value="Bills">Bills</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Health">Health</option>
+                  <option value="Education">Education</option>
+                  <option value="Other">Other</option>
+                </>
+              ) : (
+                <>
+                  <option value="Salary">Salary</option>
+                  <option value="Freelance">Freelance</option>
+                  <option value="Business">Business</option>
+                  <option value="Investment">Investment</option>
+                  <option value="Gift">Gift</option>
+                  <option value="Other">Other</option>
+                </>
+              )}
+            </select>
           </div>
 
-          {/* Payment */}
-          <div className="field">
-            <label>Payment Method</label>
-            <select value={pay} onChange={(e) => setPay(e.target.value)}>
-              {PAYMENTS.map((p) => <option key={p}>{p}</option>)}
+          {/* Date */}
+          <div className="form-group">
+            <label>Date:</label>
+            <input
+              type="date"
+              name="date"
+              value={formData.date}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          {/* Payment Method */}
+          <div className="form-group">
+            <label>Payment Method:</label>
+            <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange}>
+              <option value="UPI">UPI</option>
+              <option value="Cash">Cash</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 
           {/* Note */}
-          <div className="field">
-            <label>Note (optional)</label>
-            <input type="text" placeholder="e.g. Lunch with friends" maxLength={200}
-              value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="form-group">
+            <label>Note (Optional):</label>
+            <input
+              type="text"
+              name="note"
+              placeholder="e.g. Pizza with friends"
+              value={formData.note}
+              onChange={handleChange}
+            />
           </div>
 
-          {err && <div className="form-err">{err}</div>}
-
-          <div className="modal-btns">
-            <button type="button" className="btn-cancel" onClick={onClose} disabled={saving}>Cancel</button>
-            <button type="submit" className="btn-save" disabled={saving}>
-              {saving ? "Saving…" : isEdit ? "Update" : "Save"}
+          {/* Form Actions */}
+          <div className="modal-buttons">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? "Saving..." : isEditing ? "Update" : "Save"}
             </button>
           </div>
         </form>

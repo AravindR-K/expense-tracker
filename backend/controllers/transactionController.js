@@ -1,14 +1,12 @@
 
 const Transaction = require("../models/transactions");
 
-// GET /api/transactions?month=2026-10
 const getTransactions = async (req, res) => {
   try {
     const { month } = req.query;
     const filter = {};
 
     if (month) {
-      // Validate the YYYY-MM format
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
         return res.status(400).json({
           message: "Month must be in YYYY-MM format",
@@ -54,7 +52,6 @@ const createTransaction = async (req, res) => {
       "note",
     ];
 
-    // Reject unexpected fields
     const invalidFields = Object.keys(req.body).filter(
       (key) => !allowedFields.includes(key)
     );
