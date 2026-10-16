@@ -9,32 +9,29 @@ const transactionSchema = new mongoose.Schema(
         },
 
         type: {
-        type: String,
-        required: [true, "Transaction type is required"],
-        enum: ["income", "expense"],
+            type: String,
+            required: [true, "Transaction type is required"],
+            enum: ["income", "expense"],
         },
 
         category: {
-        type: String,
-        required: [true, "Category is required"],
-        trim: true,
+            type: String,
+            required: [true, "Category is required"],
         },
 
         date: {
-        type: Date,
-        required: [true, "Transaction date is required"],
+            type: Date,
+            required: [true, "Transaction date is required"],
         },
 
         paymentMethod: {
-        type: String,
-        required: [true, "Payment method is required"],
-        trim: true,
+            type: String,
+            required: [true, "Payment method is required"],
         },
 
         note: {
-        type: String,
-        trim: true,
-        default: "",
+            type: String,
+            default: "",
         },
     },
     {
